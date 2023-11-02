@@ -160,11 +160,11 @@ ORDER BY times_purchased DESC
 LIMIT 1;
 ```
 #### Code Explanation
-- Use COUNT aggregation on product_id column to count number times of purchased for each product in product_id column and ORDER BY the result in descending order.
+- Use COUNT aggregation on product_id column to count the number times of purchased for each product in product_id column and ORDER BY the result in descending order.
 - Use LIMIT to get the most purchased product.
   
 #### Answer
-- Most purchased item on the menu is ramen which is 8 times.
+- The most purchased item on the menu is ramen which is 8 times.
 
 ### 5. Which item was the most popular for each customer?
 ```
@@ -191,15 +191,15 @@ WHERE rank = 1;
 ```
 
 #### Code Explanation
-- Create a a Common Table Expression (CTE) called most_popular and within the CTE, join the menu table and sales table using the product_id column.
+- Create a Common Table Expression (CTE) called most_popular and within the CTE, join the menu table and sales table using the product_id column.
 - Group results by sales.customer_id and menu.product_name.
 - Calculate the count of menu.product_id occurrences for each group.
 - Use DENSE_RANK() window function to calculate the ranking of each sales.customer_id partition based on the count of orders COUNT(sales.customer_id) in descending order.
-- Select the appropriate columns and apply a filter in the WHERE clause to retrieve only the rows where the rank column equals 1 which has highest order count for each customer in the outer query.
+- Select the appropriate columns and apply a filter in the WHERE clause to retrieve only the rows where the rank column equals 1 which has the highest order count for each customer in the outer query.
   
 #### Answer
 - Customer A like ramen the most with 3 times order
-- Customer B like all items on the menu with all the same 2 times order for each item
+- Customer B like all items on the menu with the same 2 times order for each item
 - Customer C like ramen the most with 3 times order
 
 ### 6. Which item was purchased first by the customer after they became a member?
@@ -229,10 +229,10 @@ GROUP BY customer_id, product_name;
 
 ```
 #### Code Explanation
-- Create a a Common Table Expression (CTE) called orders_after_became_members.
+- Create a Common Table Expression (CTE) called orders_after_became_members.
 - Within the CTE, join the sales table and menu table using the product_id column; join the sales table and members table using the customer_id column. Additionally, apply a condition to include only sales that occurred on or after the member's join_date (sales.order_date > = members.join_date).
 - Select the appropriate columns and calculate the row number using the ROW_NUMBER() window function. The PARTITION BY clause divides the data by members.customer_id and the ORDER BY clause orders the rows within each members.customer_id partition by sales.order_date.
-- Select the appropriate columns and apply a filter in the WHERE clause to retrieve only the rows where the rank column equals 1 which has highest order count for each customer in the outer query.
+- Select the appropriate columns and apply a filter in the WHERE clause to retrieve only the rows where the rank column equals 1 which has the highest order count for each customer in the outer query.
 
 #### Answer
 - Customer A's first order as a member is ramen.
@@ -259,12 +259,12 @@ FROM order_before_become_member
 GROUP BY customer_id, product_name
 ```
 #### Code Explanation
-- Create a a Common Table Expression (CTE) called order_before_become_member.
+- Create a Common Table Expression (CTE) called order_before_become_member.
 - Within the CTE, join the sales table and menu table using the product_id column; join the sales table and members table using the customer_id column. Additionally, apply a condition to include only sales that occurred before the member's join_date (sales.order_date < members.join_date). Then select the appropriate columns.
 - Select the appropriate columns in the outer query and group them by customer_id and product_name.
 
 #### Answer
-- Both customer A and B ordered curry and sushi before became members.
+- Both customers A and B ordered curry and sushi before became members.
 
 <img width="389" alt="Screenshot 2023-11-01 at 12 42 45 AM" src="https://github.com/ByThaoNguyen/8-Week-SQL-Challenge/assets/116039570/f8f47a09-b4ef-4452-9f13-a31846babdd7">
 
@@ -285,12 +285,12 @@ GROUP BY sales.customer_id
 ```
 #### Code Explanation
 - Select the columns sales.customer_id, calculate the count of sales.product_id as total_items for each customer, and sum the menu.price as total_sales.
-- Join sales tables and members table on customer_id column, ensuring that sales.order_date is earlier than members.join_date (sales.order_date < members.join_date). Then, join menu table with sales table on product_id column.
+- Join sales tables and members table on customer_id column, ensuring that sales.order_date is earlier than members.join_date (sales.order_date < members.join_date). Then, join the menu table with the sales table on product_id column.
 - Group them by sales.customer_id.
 
 #### Answer
-- Customer A spent $25 on 2 items before becoming members.
-- Customer B spent $40 on 3 items before becoming members.
+- Customer A spent $25 on 2 items before becoming a member.
+- Customer B spent $40 on 3 items before becoming a member.
 
 <img width="439" alt="Screenshot 2023-11-01 at 12 54 34 AM" src="https://github.com/ByThaoNguyen/8-Week-SQL-Challenge/assets/116039570/7484c8cc-e819-4daf-a9d1-d74eaca772ec">
 
@@ -327,8 +327,46 @@ GROUP BY sales.customer_id
 
 ### 10. In the first week after a customer joins the program (including their join date) they earn 2x points on all items, not just sushi - how many points do customer A and B have at the end of January?
 ```
+WITH dates_cte AS (
+  SELECT 
+    m.customer_id, 
+    m.join_date, 
+    m.join_date + INTERVAL '6 days' AS valid_date, 
+    DATE_TRUNC('month', '2021-01-31'::DATE) + INTERVAL '1 month' - INTERVAL '1 day' AS last_date
+  FROM dannys_diner.members AS m
+)
+
+SELECT 
+  s.customer_id, 
+  SUM(
+    CASE
+      WHEN menu.product_name = 'sushi' THEN 2 * 10 * menu.price
+      WHEN s.order_date BETWEEN dates.join_date AND dates.valid_date THEN 2 * 10 * menu.price
+      ELSE 10 * menu.price
+    END
+  ) AS points
+FROM dannys_diner.sales AS s
+INNER JOIN dates_cte AS dates
+  ON s.customer_id = dates.customer_id
+  AND dates.join_date <= s.order_date
+  AND s.order_date <= dates.last_date
+INNER JOIN dannys_diner.menu AS menu
+  ON s.product_id = menu.product_id
+GROUP BY s.customer_id;
 
 ```
+PS: Assumpting the logic in question 9 still applying 
+
 #### Code Explanation
+- In the "dates_cte," calculate the "valid_date" by adding 6 days to the "join_date" and determine the "last_date" of the month by subtracting 1 day from the last day of January 2021.
+- From the "dannys_diner.sales" table, join the "dates_cte" using the "customer_id" column, ensuring that the "order_date" of the sale is not later than the "last_date" (sales.order_date <= dates.last_date).
+- Then, join the "dannys_diner.menu" table based on the "product_id" column.
+- In the outer query, calculate the "points" by using a CASE statement to determine the points based on the following assumptions: If the "product_name" is 'sushi', multiply the price by 2 and then by 10. For orders placed between "join_date" and "valid_date," also multiply the price by 2 and then by 10. For all other products, multiply the price by 10.
+- Calculate the sum of points for each customer.
+
 #### Answer
+- Customer A has 1,370 points.
+- Customer B has 820 points.
+  
+<img width="369" alt="Screenshot 2023-11-01 at 10 29 01 PM" src="https://github.com/ByThaoNguyen/8-Week-SQL-Challenge/assets/116039570/205d1612-7477-4d87-90bd-b0b0c63aab6b">
 
